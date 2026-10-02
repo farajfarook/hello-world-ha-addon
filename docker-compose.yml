@@ -1,0 +1,62 @@
+# Local development stack for the hello_world add-on.
+#   docker compose up --build      then open http://localhost:8123
+# See dev/README.md for details.
+name: hello-world-addon-dev
+
+services:
+  addon:
+    container_name: hello_world_dev
+    build:
+      context: ./hello_world
+      args:
+        BUILD_FROM: ghcr.io/home-assistant/amd64-base:latest
+    environment:
+      SUPERVISOR_TOKEN: dev-token
+    # Fresh /tmp on every restart (clears bashio's option cache, like a real HA restart)
+    tmpfs: [/tmp]
+    volumes:
+      # Live-edit: changes apply after `docker compose restart addon`
+      - ./hello_world/server.py:/server.py:ro
+      - ./hello_world/run.sh:/run.sh:ro
+    depends_on:
+      supervisor:
+        condition: service_healthy
+    networks:
+      hassio:
+        ipv4_address: 172.30.33.10
+
+  supervisor:
+    image: python:3.12-alpine
+    command: ["python3", "-u", "/mock_supervisor.py"]
+    environment:
+      SUPERVISOR_TOKEN: dev-token
+      ADDON_CONTAINER: hello_world_dev
+    volumes:
+      - ./dev/mock_supervisor.py:/mock_supervisor.py:ro
+      - ./dev/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('localhost', 80), 1)"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    networks:
+      hassio:
+        ipv4_address: 172.30.32.3
+
+  ingress:
+    image: nginx:alpine
+    volumes:
+      - ./dev/ingress.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8123:80"
+    depends_on: [addon]
+    networks:
+      hassio:
+        ipv4_address: 172.30.32.2   # HA ingress proxy IP expected by server.py
+
+networks:
+  hassio:
+    ipam:
+      config:
+        - subnet: 172.30.32.0/23
