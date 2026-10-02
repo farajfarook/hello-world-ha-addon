@@ -1,0 +1,13 @@
+configuration:
+  message:
+    name: Message
+    description: The message shown in the web UI and written to the log.
+  name:
+    name: Name
+    description: Who to greet.
+  color:
+    name: Accent color
+    description: Hex color used in the web UI (e.g. #03a9f4).
+  log_interval:
+    name: Log interval
+    description: Seconds between log messages (5-3600). Requires restart.
